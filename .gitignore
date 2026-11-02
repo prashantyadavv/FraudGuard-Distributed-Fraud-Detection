@@ -1,0 +1,21 @@
+# Local Python environment and cache
+.venv/
+__pycache__/
+*.py[cod]
+
+# Generated datasets and Spark runtime artifacts
+data/*.csv
+outputs/checkpoints/
+outputs/ivy-cache/
+outputs/spark-tmp/
+outputs/*.log
+
+# Generated run results are reproducible; keep the output folders themselves.
+outputs/tables/*
+!outputs/tables/.gitkeep
+outputs/figures/*
+!outputs/figures/.gitkeep
+outputs/models/*
+!outputs/models/.gitkeep
+outputs/dashboard/*
+!outputs/dashboard/.gitkeep
