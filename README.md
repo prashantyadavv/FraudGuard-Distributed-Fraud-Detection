@@ -1,159 +1,339 @@
-# Distributed Financial Fraud Detection System
+# FraudGuard — Distributed Financial Fraud Detection System
 
-A complete Cluster Computing project using PySpark 3.5, GraphFrames, and Spark MLlib. It analyzes PaySim transactions as both rows and an account network, then compares classifiers with and without graph features.
+**A big-data fraud detection project built with Apache Spark, PySpark, GraphFrames, and Spark MLlib.**
 
-![Architecture](outputs/figures/architecture.png)
+FraudGuard analyzes financial transactions using distributed data processing, account-network analysis, and machine learning. It compares transaction-based models with graph-enhanced models to investigate how relationships between accounts can help identify suspicious financial activity.
 
-## Architecture
+[View Architecture](outputs/figures/architecture.png)
 
-`Transaction data → Spark ingestion → cleaning/features → GraphFrames account graph → graph features merged back → MLlib classifier → evaluation/outputs`
+---
 
-Spark has one **driver** (plans work) and one or more **executors** (process partitions). A DataFrame is a distributed table split into partitions. Transformations are lazy: Spark records them as a DAG, then optimizes and executes it only at an action such as `count()` or `write()`. This matters for transaction-scale data because CPU and memory work can be parallelized instead of loading the whole CSV in one Python process.
+## Overview
 
-GraphX is available only to Scala/Java Spark programs. This PySpark project uses **GraphFrames**, the practical GraphX-equivalent API, while still using Spark DataFrames underneath.
+Traditional fraud detection systems often analyze transactions individually. However, suspicious financial activity can also involve networks of connected accounts, money transfers, and coordinated transaction patterns.
 
-## Setup
+FraudGuard addresses this by combining two perspectives:
 
-Local (Python 3.10--3.12 is recommended; PySpark currently may not support Python 3.13):
+- **Transaction-level analysis:** Identifies suspicious patterns using transaction amounts, account balances, transaction types, and historical activity.
+- **Graph-based analysis:** Represents accounts as vertices and transactions as edges to identify suspicious account relationships and network structures.
+
+The project uses Apache Spark to process transaction data and Spark MLlib to train and evaluate classification models.
+
+## Key Features
+
+- Distributed transaction processing using PySpark.
+- Data cleaning, exploratory analysis, and feature engineering.
+- Account-network construction and graph analytics using GraphFrames.
+- Graph-based feature extraction and integration with transaction features.
+- Fraud classification using Spark MLlib.
+- Comparison of transaction-only, graph-only, and combined feature models.
+- Imbalanced-class handling using class weights and undersampling.
+- Model evaluation using fraud-focused metrics.
+- Scalability experiments across different dataset sizes.
+- Interactive Streamlit dashboard for exploring results.
+
+## System Architecture
+
+```text
+             Financial Transaction Data
+                         |
+                         v
+                Spark Data Ingestion
+                         |
+                         v
+                Data Cleaning & EDA
+                         |
+                         v
+                 Feature Engineering
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+      Transaction Features     Account Graph
+                                     |
+                                     v
+                               GraphFrames
+                                     |
+                                     v
+                              Graph Features
+             |                       |
+             +-----------+-----------+
+                         |
+                         v
+                 Feature Integration
+                         |
+                         v
+                  Spark MLlib Models
+                         |
+                         v
+                 Model Evaluation
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+        Result Tables          Streamlit Dashboard
+```
+
+### How Spark works in this project
+
+Apache Spark distributes data across partitions and processes those partitions using executors. The driver coordinates execution and creates a Directed Acyclic Graph (DAG) of operations.
+
+Spark transformations are lazy, meaning computation is delayed until an action such as `count()` or `write()` triggers execution. This allows Spark to optimize the execution plan before processing the data.
+
+## Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| Python | Core programming language |
+| Apache Spark 3.5 | Distributed data processing |
+| PySpark | Spark integration with Python |
+| GraphFrames | Account-network analysis |
+| Spark MLlib | Machine learning |
+| Pandas & NumPy | Supporting data operations |
+| Matplotlib | Data visualization |
+| Streamlit | Interactive dashboard |
+| Pytest | Automated testing |
+
+**GraphFrames vs GraphX:** This implementation uses GraphFrames, a DataFrame-based graph processing library accessible through PySpark. GraphX is Spark's graph processing API for Scala/Java. This project performs graph analytics through GraphFrames; it is not a native GraphX implementation.
+
+## Graph Analytics
+
+The account network is constructed using:
+
+- **Vertices:** Financial accounts.
+- **Edges:** Transactions between accounts.
+
+The project investigates network patterns using:
+
+- In-degree and out-degree.
+- PageRank.
+- Connected components.
+- Community structures.
+- Suspicious account relationships.
+- High fan-out and high in-degree accounts.
+- Transfer-to-cash-out transaction motifs.
+
+These features help identify patterns that may not be visible when analyzing individual transactions alone.
+
+## Machine Learning
+
+FraudGuard compares different feature configurations:
+
+| Model configuration | Description |
+|---|---|
+| Legitimate-only baseline | Predicts all transactions as legitimate |
+| Transaction-only | Uses transaction-level features |
+| Graph-only | Uses graph-derived features |
+| Combined | Uses transaction and graph features |
+
+The evaluation focuses on:
+
+- Precision
+- Recall
+- F1-score
+- PR-AUC
+- ROC-AUC
+- False-positive rate
+- False-negative count
+
+Accuracy is not treated as the primary metric because fraud is a minority class in the dataset.
+
+### Evaluation safeguards
+
+- A deterministic, stratified 80/20 train-test split is used.
+- Sender-history features for held-out transactions are derived from training data only.
+- Held-out graph features are generated from the training account graph.
+- `isFlaggedFraud` is excluded to avoid using a pre-existing rule as a predictive feature.
+- Class weighting and an undersampling helper are available for imbalance handling.
+
+## Dataset
+
+The project supports synthetic PaySim-style transaction data and the original PaySim CSV format.
+
+The included fallback dataset contains:
+
+| Property | Value |
+|---|---:|
+| Total transactions | 100,000 |
+| Legitimate transactions | 99,500 |
+| Fraudulent transactions | 500 |
+| Fraud proportion | 0.5% |
+
+The data generator can create larger synthetic datasets for experimentation.
+
+**Important:** Synthetic data is useful for development and controlled experiments, but it does not fully represent real-world fraud behavior.
+
+## Interactive Dashboard
+
+FraudGuard includes a Streamlit dashboard that reads previously generated artifacts. It does not launch Spark jobs or retrain models when opened.
+
+Dashboard sections:
+
+1. Executive Overview
+2. Transaction Explorer
+3. Graph Explorer
+4. Model Evaluation
+5. Scalability & Performance
+6. Pipeline Status & Data Quality
+
+### Run the dashboard
+
+```powershell
+.venv\Scripts\python.exe -m streamlit run dashboard\app.py
+```
+
+Open `http://localhost:8501` in your browser.
+
+## Project Setup
+
+### Prerequisites
+
+- Python 3.10–3.12 recommended.
+- Java compatible with your Spark installation.
+- Apache Spark 3.5.
+- Git.
+
+### 1. Clone the repository
 
 ```bash
-cd fraud-detection-spark
+git clone https://github.com/prashantyadavv/FraudGuard-Distributed-Fraud-Detection.git
+cd FraudGuard-Distributed-Fraud-Detection
+```
+
+### 2. Create a virtual environment
+
+```bash
 python -m venv .venv
-# Windows: .venv\Scripts\activate
+```
+
+Windows:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
+
+### 4. Generate synthetic transaction data
+
+```bash
 python data_generator.py --rows 100000
+```
+
+### 5. Execute the pipeline
+
+```bash
 python src/main.py --skip-scalability
 ```
 
-For PaySim, install/configure the Kaggle CLI token then run `python download_data.py`; pass its CSV with `--data-path`.
+The pipeline performs ingestion, preprocessing, feature engineering, graph analysis, model training, evaluation, and output generation.
 
-Google Colab:
+### Use an original PaySim dataset
 
-```python
-!pip install pyspark==3.5.3 graphframes==0.6 pandas matplotlib kaggle
-!git clone <your-repository-url>
-%cd fraud-detection-spark
-!python data_generator.py --rows 100000
-!python src/main.py --skip-scalability
+Configure your Kaggle credentials and run:
+
+```bash
+python download_data.py
 ```
 
-The PyPI `graphframes==0.6` dependency is only the Python wrapper. The Spark session explicitly requests the actual graph engine, `graphframes:graphframes:0.8.3-spark3.5-s_2.12`, and sets a checkpoint directory for Connected Components.
-
-### Windows-only prerequisite: `winutils.exe`
-
-Some Windows Hadoop/Spark installations need the filesystem helpers named
-`winutils.exe` and `hadoop.dll`. If startup says that `C:\hadoop\bin` does not
-exist, Spark has not processed any transaction data yet. Create `C:\hadoop\bin`,
-then place Hadoop 3.3.x-compatible copies of both files there from a source
-approved by your university or IT team. Set these PowerShell-session variables
-and rerun:
-
-```powershell
-$env:HADOOP_HOME = "C:\hadoop"
-$env:PATH = "C:\hadoop\bin;$env:PATH"
-.\.venv\Scripts\python.exe -u src\main.py --skip-scalability
-```
-
-## Run options
+Then specify the downloaded CSV:
 
 ```bash
 python src/main.py --data-path data/PS_20174392719_1491204439457_log.csv
-python src/main.py --sample-fraction 0.1 --skip-scalability
-python data_generator.py --rows 500000
 ```
 
-Outputs are written under `outputs/tables`, `outputs/figures`, and `outputs/models`. The scalability runner records stage runtime; repeat commands for 100K, 500K, 1M, and 3M while changing `local[*]` / shuffle partitions in `create_spark` to populate the complete experiment matrix.
+## Windows Hadoop Configuration
 
-## FraudGuard dashboard
+Some Windows Spark installations require Hadoop filesystem helper binaries.
 
-The Streamlit dashboard reads saved artifacts only: it never launches Spark,
-recomputes graph analysis, or retrains models. A completed pipeline writes a
-manifest, bounded graph data, held-out predictions, model metrics, and timing
-data under `outputs/dashboard/`.
+If Spark reports that `C:\hadoop\bin` is missing, configure compatible `winutils.exe` and `hadoop.dll` files from a trusted university or IT-approved source.
+
+In PowerShell:
 
 ```powershell
 $env:HADOOP_HOME = "C:\hadoop"
 $env:PATH = "C:\hadoop\bin;$env:PATH"
-.\.venv\Scripts\python.exe -u src\main.py --skip-scalability
-.\.venv\Scripts\python.exe -m streamlit run dashboard\app.py
 ```
 
-Dashboard pages are Executive Overview, Transaction Explorer, Graph Explorer,
-Model Evaluation, Scalability & Performance, and Pipeline Status & Data Quality.
-When a required artifact is absent, the page shows instructions rather than
-inventing values or claims.
-
-## Evaluation reliability
-
-The pipeline performs a deterministic stratified 80/20 evaluation split before
-training graph features. Sender history for held-out rows comes only from the
-training partition; graph features for held-out rows come only from the
-training account graph. This prevents test labels, future test activity, and
-test graph relationships from entering training features. The generated data's
-fraud constructions can still be easier than real fraud; perfect scores must be
-treated as a synthetic-data limitation, not as proof of production readiness.
-
-The comparison includes a legitimate-only baseline and transaction-only,
-graph-only, and combined transaction-plus-graph feature variants. The primary
-metrics are fraud-class precision, recall, F1, PR-AUC, ROC-AUC, false-positive
-rate, and false-negative count; accuracy is deliberately not used as the lead
-metric.
-
-## Run a real scalability benchmark
-
-The normal pipeline saves its own stage timings. Run the independent benchmark
-only when you choose to measure it; it records actual local Spark aggregation
-timings and does not claim multi-node performance.
+Then run:
 
 ```powershell
-.\.venv\Scripts\python.exe -m src.scalability_experiments `
-  --data-path data\synthetic_paysim_100000.csv `
-  --sizes 10000 25000 50000 100000
+.\.venv\Scripts\python.exe -u src\main.py --skip-scalability
 ```
 
-It writes `scalability_by_size.csv`, `runtime_by_size.png`, and
-`throughput_by_size.png`. Hardware, master mode, and shuffle partition settings
-are recorded with the measurements.
+## Scalability Experiments
 
-## GraphFrames and GraphX
+The independent scalability runner measures local Spark aggregation performance across different input sizes.
 
-This project uses **GraphFrames**, not GraphX. GraphX is Spark's Scala/Java API;
-GraphFrames is a separate DataFrame-based graph library that can be used from
-PySpark. It satisfies the graph-analysis learning objective (degrees, PageRank,
-components, communities, and motifs), but it is not a GraphX implementation.
-A genuine GraphX deliverable would require adding a separate Scala/Spark module;
-that should be approved by an instructor rather than replacing this working
-Windows/Python pipeline.
+```powershell
+.\.venv\Scripts\python.exe -m src.scalability_experiments --data-path data\synthetic_paysim_100000.csv --sizes 10000 25000 50000 100000
+```
 
-## Tests
+Generated files include:
+
+- `scalability_by_size.csv`
+- `runtime_by_size.png`
+- `throughput_by_size.png`
+
+Results depend on hardware, Spark configuration, execution mode, and warm-up effects. These measurements represent local execution and should not be presented as multi-node cluster benchmarks.
+
+## Output Structure
+
+```text
+outputs/
+├── dashboard/
+├── figures/
+├── models/
+└── tables/
+```
+
+Key outputs include model comparison tables, graph analysis results, suspicious-account reports, runtime measurements, and dashboard artifacts.
+
+## Run Tests
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-## Sample fallback-data result
+## Limitations
 
-The included `synthetic_paysim_100000.csv` contains **100,000** transactions: **99,500 legitimate** and **500 fraud** (0.5%). After a Spark run, `model_comparison_with_graph.csv`, `model_comparison_without_graph.csv`, `suspicious_mules/`, `top_accounts_degree/`, and `runtime_stages.csv` provide the requested final summary from your machine. Scores intentionally are not pre-filled: they depend on your Spark/GraphFrames version and train/test time split.
+- The fallback dataset is synthetic and may contain simpler fraud patterns than real financial systems.
+- GraphFrames is used instead of native GraphX.
+- Local scalability measurements do not demonstrate performance across a multi-node cluster.
+- High model scores on synthetic data do not establish real-world fraud detection accuracy.
+- Production deployment would require additional testing, real transaction data, monitoring, and security controls.
 
-## Methods and safeguards
+## Future Improvements
 
-- Cleaning removes nulls/duplicates and negative amounts. EDA gives transaction/fraud rates by type, time trends, and high-volume accounts.
-- Features include balance errors, drained accounts, amount/balance ratio, time, merchant flag, and Window-based sender history.
-- Graph analysis finds degree, PageRank, components, communities, rings, high-in-degree mule accounts, fan-out, and TRANSFER→CASH_OUT motifs.
-- `isFlaggedFraud` is excluded because it is a pre-existing rule and would leak a label-like signal. The project uses a deterministic stratified split so the rare fraud class is represented in both train and test; this avoids invalid zero-positive test metrics in the generated dataset.
-- Severe imbalance is handled with `weightCol`; an undersampling helper is included for comparison. AUC-PR, precision and recall are central because high accuracy can simply mean predicting every transaction as legitimate.
+- Implement a native Scala-based GraphX module.
+- Evaluate against larger real-world transaction datasets.
+- Perform multi-node Spark cluster experiments.
+- Explore advanced graph-based machine learning models.
+- Add streaming fraud detection using Spark Structured Streaming.
+- Introduce model monitoring and concept-drift detection.
 
-## How to explain this project in a viva
+## Viva Preparation
 
-1. **Why Spark?** It distributes large transaction processing across partitions and avoids single-machine memory limits.
-2. **GraphX vs GraphFrames?** GraphX is Scala/Java; GraphFrames exposes analogous graph algorithms to PySpark.
-3. **What is PageRank?** It scores accounts important because important accounts connect to them.
-4. **Connected components?** Groups of accounts linked by any transaction path.
-5. **Why class weights?** Fraud is rare, so positive mistakes need more training influence.
-6. **Why is accuracy misleading?** A 0.5% fraud dataset can get 99.5% accuracy by detecting none.
-7. **Precision vs recall?** Precision limits false alerts; recall catches more fraud.
-8. **AUC-PR vs AUC-ROC?** PR is more revealing when positives are rare.
-9. **What is leakage?** Using information unavailable at prediction time, making results unrealistically good.
-10. **What is a partition?** One independently processed slice of distributed data.
-11. **What is lazy evaluation?** Spark delays transformations until an action, enabling DAG optimization.
-12. **Why graph features?** Fraud rings, mules, and hubs are patterns across accounts, not a single row.
+Topics demonstrated in this project include:
+
+1. Why Apache Spark is used for distributed processing.
+2. Driver, executor, partitions, and DAG execution.
+3. Lazy evaluation and transformations versus actions.
+4. GraphFrames versus GraphX.
+5. PageRank and connected components.
+6. Fraud detection using graph relationships.
+7. Class imbalance and class weighting.
+8. Precision, recall, F1-score, PR-AUC, and ROC-AUC.
+9. Data leakage and train-test separation.
+10. Scalability benchmarking.
+
+---
+
+**Project:** FraudGuard — Distributed Financial Fraud Detection System  
+**Repository:** [GitHub](https://github.com/prashantyadavv/FraudGuard-Distributed-Fraud-Detection)
+
+*Built as a Cluster Computing project to explore distributed financial data processing, graph analytics, and machine learning.*
